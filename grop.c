@@ -419,12 +419,14 @@ static size_t read_file(const char *path, uint32_t **data) {
     *data = malloc(file_size);
     fread(*data, 1, file_size, fp);
 
+    fclose(fp);
+
     return file_size;
 }
 
 static void create_rv32_cpu(const char *program_path, struct rv32_cpu **cpu) {
     *cpu = calloc(sizeof(struct rv32_cpu), 1);
-    size_t program_size = read_file(program_path, &(*cpu)->mem);
+    read_file(program_path, &(*cpu)->mem);
     (*cpu)->mem = realloc((*cpu)->mem, 0x8000);
     (*cpu)->byte_cnt = 0x8000;
 }
