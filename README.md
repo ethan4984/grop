@@ -1,2 +1,2 @@
 # grop
-simple RISC-V emulator
+This is a simple RV32I Base Instruction Set emulator
