@@ -379,15 +379,15 @@ static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
             cpu->regs[inst_J.rd] = cpu->pc + 4;
             cpu->pc += (((((inst_J.imm2 << 10) | inst_J.imm1) << 11) | inst_J.imm0) << 19) | inst_J.imm3;
 
-            goto end;
+            return 0;
         }
         case 0b1100111: { // jalr
             struct inst_I inst_I = *(struct inst_I*)word;
 
             cpu->regs[inst_I.imm.rd] = cpu->pc + 4;
             cpu->pc = cpu->regs[inst_I.imm.rs1] + inst_I.imm.imm;
-
-            goto end;
+    
+            return 0;
         }
     }
 
