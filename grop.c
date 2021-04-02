@@ -2,6 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
+#include <math.h>
+
+#define SIGN(EXPR, BIT_LENGTH) (ssize_t)(((EXPR) & (1 << (BIT_LENGTH - 1))) ? -(pow(2, BIT_LENGTH) - (EXPR)) : (EXPR))
 
 struct rv32_cpu {
     uint32_t regs[32];
@@ -258,37 +261,49 @@ struct rv32_inst_B {
 
 static void rv32_beq(struct rv32_cpu *cpu, struct inst_B *inst) {
     if(cpu->regs[inst->rs1] == cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
 static void rv32_bne(struct rv32_cpu *cpu, struct inst_B *inst) {
     if(cpu->regs[inst->rs1] != cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
 static void rv32_blt(struct rv32_cpu *cpu, struct inst_B *inst) {
     if((signed)cpu->regs[inst->rs1] < (signed)cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
 static void rv32_bge(struct rv32_cpu *cpu, struct inst_B *inst) {
     if((signed)cpu->regs[inst->rs1] > (signed)cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
 static void rv32_bltu(struct rv32_cpu *cpu, struct inst_B *inst) {
     if(cpu->regs[inst->rs1] < cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
 static void rv32_bgeu(struct rv32_cpu *cpu, struct inst_B *inst) {
     if(cpu->regs[inst->rs1] > cpu->regs[inst->rs2]) {
-        cpu->pc += (((((inst->imm0 << 1) | inst->imm1) << 5) | inst->imm2) << 11) | inst->imm3;
+        cpu->pc += SIGN(((inst->imm3 << 1 | inst->imm0) << 6 | inst->imm2) << 4 | inst->imm1, 12) * 2;
+    } else {
+        cpu->pc += 4;
     }
 }
 
@@ -353,7 +368,7 @@ static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
             for(size_t i = 0; i < sizeof(rv32_B_list) / sizeof(struct rv32_inst_B); i++) {
                 if(rv32_B_list[i].inst.func3 == inst_B.func3) {
                     rv32_B_list[i].handler(cpu, &inst_B);
-                    goto end;
+                    return 0;
                 }
             }
 
@@ -437,13 +452,18 @@ int main(int argc, char *argv[]) {
         exit(0);
     }
 
-    struct rv32_cpu *cpu;
-    create_rv32_cpu(argv[1], &cpu);
+    for(int i = 1; i < argc; i++) {
+        struct rv32_cpu *cpu;
+        create_rv32_cpu(argv[i], &cpu);
 
-    for(;;) {
-        if(instruction_decode(cpu, &cpu->mem[cpu->pc / 4]) == -1) {\
-            rv32_reg_dump(cpu);
-            exit(0);
+        for(;;) {
+            if(instruction_decode(cpu, &cpu->mem[cpu->pc / 4]) == -1) {\
+                rv32_reg_dump(cpu);
+                exit(0);
+            }
         }
+
+        free(cpu->mem);
+        free(cpu);
     }
 }
