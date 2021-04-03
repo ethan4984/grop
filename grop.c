@@ -132,6 +132,10 @@ static void rv32_sra(struct rv32_cpu *cpu, struct inst_R *inst) {
     cpu->regs[inst->rd] = (signed)cpu->regs[inst->rs1] >> (signed)cpu->regs[inst->rs2];
 }
 
+static void rv32_mul(struct rv32_cpu *cpu, struct inst_R *inst) {
+    cpu->regs[inst->rd] = cpu->regs[inst->rs1] * cpu->regs[inst->rs2];
+}
+
 static struct rv32_inst_R rv32_R_list[] = {
     { .inst = { .opcode = 0b0110011, .func3 = 0b000, .func7 = 0b0000000 }, .handler = rv32_add },
     { .inst = { .opcode = 0b0110011, .func3 = 0b000, .func7 = 0b0100000 }, .handler = rv32_sub },
@@ -142,7 +146,8 @@ static struct rv32_inst_R rv32_R_list[] = {
     { .inst = { .opcode = 0b0110011, .func3 = 0b101, .func7 = 0b0000000 }, .handler = rv32_srl },
     { .inst = { .opcode = 0b0110011, .func3 = 0b101, .func7 = 0b0100000 }, .handler = rv32_sra }, 
     { .inst = { .opcode = 0b0110011, .func3 = 0b110, .func7 = 0b0000000 }, .handler = rv32_or },
-    { .inst = { .opcode = 0b0110011, .func3 = 0b111, .func7 = 0b0000000 }, .handler = rv32_and }
+    { .inst = { .opcode = 0b0110011, .func3 = 0b111, .func7 = 0b0000000 }, .handler = rv32_and },
+    { .inst = { .opcode = 0b0110011, .func3 = 0b000, .func7 = 0b0000001 }, .handler = rv32_mul }
 };
 
 struct rv32_inst_I {
@@ -151,7 +156,7 @@ struct rv32_inst_I {
 };
 
 static void rv32_addi(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] + inst->imm.imm;
+    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] + SIGN(inst->imm.imm, 12);
 }
 
 static void rv32_slti(struct rv32_cpu *cpu, struct inst_I *inst) {
@@ -319,6 +324,8 @@ static struct rv32_inst_B rv32_B_list[] = {
 static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
     uint8_t opcode = *word & 0x7f;
 
+    printf("Opcode %x\n", opcode);
+
     switch(opcode) {
         case 0b0110011: { // type_R
             struct inst_R inst_R = *(struct inst_R*)word;
@@ -335,14 +342,14 @@ static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
         case 0b0000011: // TYPE_I
         case 0b0010011: {
             struct inst_I inst_I = *(struct inst_I*)word;
-
+            
             for(size_t i = 0; i < sizeof(rv32_I_list) / sizeof(struct rv32_inst_I); i++) {
-                if(rv32_I_list[i].inst.imm.func3 == inst_I.imm.func3) {
+                if(rv32_I_list[i].inst.imm.opcode == opcode && rv32_I_list[i].inst.imm.func3 == inst_I.imm.func3) {
                     rv32_I_list[i].handler(cpu, &inst_I);
                     goto end;
                 }
 
-                if(rv32_I_list[i].inst.shift.func3 == inst_I.shift.func3 && rv32_I_list[i].inst.shift.func7 == inst_I.shift.func7) {
+                if(rv32_I_list[i].inst.shift.opcode == opcode && rv32_I_list[i].inst.shift.func3 == inst_I.shift.func3 && rv32_I_list[i].inst.shift.func7 == inst_I.shift.func7) {
                     rv32_I_list[i].handler(cpu, &inst_I);
                     goto end;
                 }
@@ -390,9 +397,11 @@ static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
         }
         case 0b1101111: { // jal
             struct inst_J inst_J = *(struct inst_J*)word;
+        
+            if(inst_J.rd != 0)
+                cpu->regs[inst_J.rd] = cpu->pc + 4;
 
-            cpu->regs[inst_J.rd] = cpu->pc + 4;
-            cpu->pc += (((((inst_J.imm2 << 10) | inst_J.imm1) << 11) | inst_J.imm0) << 19) | inst_J.imm3;
+            cpu->pc += ((inst_J.imm3 << 8 | inst_J.imm0) << 1 | inst_J.imm1) << 8 |  inst_J.imm2;
 
             return 0;
         }
@@ -441,9 +450,11 @@ static size_t read_file(const char *path, uint32_t **data) {
 
 static void create_rv32_cpu(const char *program_path, struct rv32_cpu **cpu) {
     *cpu = calloc(sizeof(struct rv32_cpu), 1);
+
     read_file(program_path, &(*cpu)->mem);
     (*cpu)->mem = realloc((*cpu)->mem, 0x8000);
     (*cpu)->byte_cnt = 0x8000;
+    (*cpu)->regs[2] = 0x1000;
 }
 
 int main(int argc, char *argv[]) {
