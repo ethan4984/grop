@@ -6,6 +6,16 @@
 
 #define SIGN(EXPR, BIT_LENGTH) (ssize_t)(((EXPR) & (1 << (BIT_LENGTH - 1))) ? -(pow(2, BIT_LENGTH) - (EXPR)) : (EXPR))
 
+#define WRITE_REG(CPU, REG_NUMBER, VALUE) ({ \
+__label__ end; \
+    if((REG_NUMBER) == 0) { \
+        goto end; \
+    } \
+    (cpu)->regs[REG_NUMBER] = VALUE; \
+end: \
+    0; \
+})
+
 struct rv32_cpu {
     uint32_t regs[32];
     uint32_t pc;
@@ -85,55 +95,55 @@ struct rv32_inst_R {
 };
 
 static void rv32_add(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] + cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] + cpu->regs[inst->rs2]);
 }
 
 static void rv32_sub(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] - cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] - cpu->regs[inst->rs2]);
 }
 
 static void rv32_sll(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] << cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] << cpu->regs[inst->rs2]);
 }
 
 static void rv32_srl(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] >> cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] >> cpu->regs[inst->rs2]);
 }
 
 static void rv32_slt(struct rv32_cpu *cpu, struct inst_R *inst) {
     if((signed)cpu->regs[inst->rs1] < (signed)cpu->regs[inst->rs2]) {
-        cpu->regs[inst->rd] = 1;  
+		WRITE_REG(cpu, inst->rd, 1);
     } else {
-        cpu->regs[inst->rd] = cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2];
+		WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2]);
     }
 }
 
 static void rv32_sltu(struct rv32_cpu *cpu, struct inst_R *inst) {
     if(cpu->regs[inst->rs1] < cpu->regs[inst->rs2]) {
-        cpu->regs[inst->rd] = 1;  
+		WRITE_REG(cpu, inst->rd, 1);
     } else {
-        cpu->regs[inst->rd] = cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2];
+		WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2]);
     }
 }
 
 static void rv32_xor(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] ^ cpu->regs[inst->rs2]);
 }
 
 static void rv32_or(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] | cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] | cpu->regs[inst->rs2]);
 }
 
 static void rv32_and(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] & cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] & cpu->regs[inst->rs2]);
 }
 
 static void rv32_sra(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = (signed)cpu->regs[inst->rs1] >> (signed)cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, (signed)cpu->regs[inst->rs1] >> (signed)cpu->regs[inst->rs2]);
 }
 
 static void rv32_mul(struct rv32_cpu *cpu, struct inst_R *inst) {
-    cpu->regs[inst->rd] = cpu->regs[inst->rs1] * cpu->regs[inst->rs2];
+    WRITE_REG(cpu, inst->rd, cpu->regs[inst->rs1] * cpu->regs[inst->rs2]);
 }
 
 static struct rv32_inst_R rv32_R_list[] = {
@@ -156,67 +166,67 @@ struct rv32_inst_I {
 };
 
 static void rv32_addi(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] + SIGN(inst->imm.imm, 12);
+    WRITE_REG(cpu, inst->imm.rd, cpu->regs[inst->imm.rs1] + SIGN(inst->imm.imm, 12));
 }
 
 static void rv32_slti(struct rv32_cpu *cpu, struct inst_I *inst) {
-    if((signed)cpu->regs[inst->imm.rs1] < (signed)inst->imm.imm) {
-        cpu->regs[inst->imm.rd] = 1;  
+    if((signed)cpu->regs[inst->imm.rs1] < SIGN(inst->imm.imm, 12)) {
+        WRITE_REG(cpu, inst->imm.rd, 1);
     } else {
-        cpu->regs[inst->imm.rd] = 0;  
+        WRITE_REG(cpu, inst->imm.rd, 0);
     }
 }
 
 static void rv32_sltiu(struct rv32_cpu *cpu, struct inst_I *inst) {
     if(cpu->regs[inst->imm.rs1] < inst->imm.imm) {
-        cpu->regs[inst->imm.rd] = 1;  
+        WRITE_REG(cpu, inst->imm.rd, 1);
     } else {
-        cpu->regs[inst->imm.rd] = 0;  
+        WRITE_REG(cpu, inst->imm.rd, 0);
     }
 }
 
 static void rv32_xori(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] ^ inst->imm.imm;
+    WRITE_REG(cpu, inst->imm.rd, cpu->regs[inst->imm.rs1] ^ inst->imm.imm);
 }
 
 static void rv32_ori(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] | inst->imm.imm;
+    WRITE_REG(cpu, inst->imm. rd,cpu->regs[inst->imm.rs1] | inst->imm.imm);
 }
 
 static void rv32_andi(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->regs[inst->imm.rs1] & inst->imm.imm;
+    WRITE_REG(cpu, inst->imm.rd, cpu->regs[inst->imm.rs1] & inst->imm.imm);
 }
 
 static void rv32_slli(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->shift.rd] = cpu->regs[inst->shift.rs1] << inst->shift.shamt;
+	WRITE_REG(cpu, inst->shift.rd, cpu->regs[inst->shift.rs1] << inst->shift.shamt);
 }
 
 static void rv32_srli(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->shift.rd] = cpu->regs[inst->shift.rs1] >> inst->shift.shamt;
+    WRITE_REG(cpu, inst->shift.rd, cpu->regs[inst->shift.rs1] >> inst->shift.shamt);
 }
 
 static void rv32_srai(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->shift.rd] = (signed)cpu->regs[inst->shift.rs1] >> (signed)inst->shift.shamt;
+    WRITE_REG(cpu, inst->shift.rd, cpu->regs[inst->shift.rs1] >> inst->shift.shamt);
 }
 
 static void rv32_lb(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = (uint8_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4] | 0xff000000;
+    WRITE_REG(cpu, inst->shift.rd, (uint8_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4] | 0xff000000);
 }
 
 static void rv32_lh(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = (uint16_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4] | 0xffff0000;
+    WRITE_REG(cpu, inst->shift.rd, (uint16_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4] | 0xffff0000);
 }
 
 static void rv32_lw(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4];
+    WRITE_REG(cpu, inst->shift.rd, cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4]);
 }
 
 static void rv32_lbu(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = (uint8_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4];
+    WRITE_REG(cpu, inst->shift.rd, (uint8_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4]);
 }
 
 static void rv32_lhu(struct rv32_cpu *cpu, struct inst_I *inst) {
-    cpu->regs[inst->imm.rd] = (uint16_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4];
+    WRITE_REG(cpu, inst->shift.rd, (uint16_t)cpu->mem[(cpu->regs[inst->imm.rs1] + inst->imm.imm) / 4]);
 }
 
 static struct rv32_inst_I rv32_I_list[] = {
@@ -323,8 +333,6 @@ static struct rv32_inst_B rv32_B_list[] = {
 
 static int instruction_decode(struct rv32_cpu *cpu, uint32_t *word) {
     uint8_t opcode = *word & 0x7f;
-
-    printf("Opcode %x\n", opcode);
 
     switch(opcode) {
         case 0b0110011: { // type_R
